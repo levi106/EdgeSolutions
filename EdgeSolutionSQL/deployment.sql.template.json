@@ -1,0 +1,171 @@
+{
+  "$schema-template": "2.0.0",
+  "modulesContent": {
+    "$edgeAgent": {
+      "properties.desired": {
+        "schemaVersion": "1.0",
+        "runtime": {
+          "type": "docker",
+          "settings": {
+            "minDockerVersion": "v1.25",
+            "loggingOptions": "",
+            "registryCredentials": {
+              "iotedgedemo42": {
+                "username": "$CONTAINER_REGISTRY_USERNAME_iotedgedemo42",
+                "password": "$CONTAINER_REGISTRY_PASSWORD_iotedgedemo42",
+                "address": "iotedgedemo42.azurecr.io"
+              }
+            }
+          }
+        },
+        "systemModules": {
+          "edgeAgent": {
+            "type": "docker",
+            "settings": {
+              "image": "mcr.microsoft.com/azureiotedge-agent:1.0",
+              "createOptions": {}
+            }
+          },
+          "edgeHub": {
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "mcr.microsoft.com/azureiotedge-hub:1.0",
+              "createOptions": {
+                "HostConfig": {
+                  "PortBindings": {
+                    "5671/tcp": [
+                      {
+                        "HostPort": "5671"
+                      }
+                    ],
+                    "8883/tcp": [
+                      {
+                        "HostPort": "8883"
+                      }
+                    ],
+                    "443/tcp": [
+                      {
+                        "HostPort": "443"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "modules": {
+          "sqlFunction": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "${MODULES.sqlFunction}",
+              "createOptions": {}
+            }
+          },
+          "SimulatedTemperatureSensor": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "mcr.microsoft.com/azureiotedge-simulated-temperature-sensor:1.0",
+              "createOptions": {}
+            }
+          },
+          "cratedb": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "crate:4.1.4",
+              "createOptions": {
+                "Hostname": "cratedb",
+                "HostConfig": {
+                  "ExposePorts": {
+                    "4200/tcp": {},
+                    "5432/tcp": {}
+                  },
+                  "PortBindings": {
+                    "4200/tcp": [
+                      {
+                        "HostPort": "4200"
+                      }
+                    ],
+                    "5432/tcp": [
+                      {
+                        "HostPort": "5432"
+                      }
+                    ]
+                  },
+                  "Binds": [
+                    "/datadrive/cratedata:/data"
+                  ]
+                }
+              }
+            }
+          },
+          "sql": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "microsoft/mssql-server-linux:2017-latest",
+              "createOptions": {
+                "Env": [
+                  "ACCEPT_EULA=Y",
+                  "MSSQL_SA_PASSWORD=Strong!Passw0rd"
+                ],
+                "HostConfig": {
+                  "Mounts": [
+                    {
+                      "Source": "sqlVolume",
+                      "Target": "/var/opt/mssql",
+                      "Type": "volume"
+                    }
+                  ],
+                  "PortBindings": {
+                    "1433/tcp": [
+                      {
+                        "HostPort": "1401"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "SourceModule": {
+            "version": "1.0",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "${MODULES.SourceModule}",
+              "createOptions": {}
+            }
+          }
+        }
+      }
+    },
+    "$edgeHub": {
+      "properties.desired": {
+        "schemaVersion": "1.0",
+        "routes": {
+          "sqlFunctionToIoTHub": "FROM /messages/modules/sqlFunction/outputs/* INTO $upstream",
+          "sqlToIoTHub": "FROM /messages/modules/sql/outputs/* INTO $upstream",
+          "SourceModuleToIoTHub": "FROM /messages/modules/SourceModule/outputs/* INTO $upstream"
+        },
+        "storeAndForwardConfiguration": {
+          "timeToLiveSecs": 7200
+        }
+      }
+    }
+  }
+}

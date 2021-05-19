@@ -1,0 +1,179 @@
+{
+  "$schema-template": "2.0.0",
+  "modulesContent": {
+    "$edgeAgent": {
+      "properties.desired": {
+        "schemaVersion": "1.0",
+        "runtime": {
+          "type": "docker",
+          "settings": {
+            "minDockerVersion": "v1.25",
+            "loggingOptions": "",
+            "registryCredentials": {
+              "iotedgedemo42": {
+                "username": "$CONTAINER_REGISTRY_USERNAME_iotedgedemo42",
+                "password": "$CONTAINER_REGISTRY_PASSWORD_iotedgedemo42",
+                "address": "iotedgedemo42.azurecr.io"
+              }
+            }
+          }
+        },
+        "systemModules": {
+          "edgeAgent": {
+            "type": "docker",
+            "settings": {
+              "image": "mcr.microsoft.com/azureiotedge-agent:1.0",
+              "createOptions": {}
+            }
+          },
+          "edgeHub": {
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "mcr.microsoft.com/azureiotedge-hub:1.0",
+              "createOptions": {
+                "HostConfig": {
+                  "PortBindings": {
+                    "5671/tcp": [
+                      {
+                        "HostPort": "5671"
+                      }
+                    ],
+                    "8883/tcp": [
+                      {
+                        "HostPort": "8883"
+                      }
+                    ],
+                    "443/tcp": [
+                      {
+                        "HostPort": "443"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "modules": {
+          "source": {
+            "version": "1.15",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "${MODULES.StorageMessageSource}",
+              "createOptions": {
+                "Env": [
+                  "AZURE_STORAGE_CONNECTION_STRING=$AZURE_STORAGE_CONNECTION_STRING",
+                  "Logging__LogLevel__StorageMessageSource.Program=Debug",
+                  "Logging__LogLevel__System=Information",
+                  "Logging__LogLevel__Microsoft=Information",
+                  "APPLICATION_INSIGHTS_INSTRUMENTATION_KEY=$APPLICATION_INSIGHTS_INSTRUMENTATION_KEY"
+                ]
+              }
+            }
+          },
+          "processor1": {
+            "version": "1.6",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "${MODULES.StorageMessageProcessor}",
+              "createOptions": {
+                "env": [
+                  "AZURE_STORAGE_CONNECTION_STRING=$AZURE_STORAGE_CONNECTION_STRING",
+                  "Logging__LogLevel__StorageMessageProcessor.Program=Debug",
+                  "Logging__LogLevel__System=Information",
+                  "Logging__LogLevel__Microsoft=Information",
+                  "APPLICATION_INSIGHTS_INSTRUMENTATION_KEY=$APPLICATION_INSIGHTS_INSTRUMENTATION_KEY"
+                ]
+              }
+            }
+          },
+          "processor2": {
+            "version": "1.6",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "${MODULES.StorageMessageProcessor}",
+              "createOptions": {
+                "env": [
+                  "AZURE_STORAGE_CONNECTION_STRING=$AZURE_STORAGE_CONNECTION_STRING",
+                  "Logging__LogLevel__StorageMessageProcessor.Program=Debug",
+                  "Logging__LogLevel__System=Information",
+                  "Logging__LogLevel__Microsoft=Information",
+                  "APPLICATION_INSIGHTS_INSTRUMENTATION_KEY=$APPLICATION_INSIGHTS_INSTRUMENTATION_KEY"
+                ]
+              }
+            }
+          },
+          "blobstoremodule": {
+            "versoin": "1.11",
+            "type": "docker",
+            "status": "running",
+            "restartPolicy": "always",
+            "settings": {
+              "image": "mcr.microsoft.com/azure-blob-storage:latest",
+              "createOptions": {
+                "Env": [
+                  "LOCAL_STORAGE_ACCOUNT_NAME=blobuser",
+                  "LOCAL_STORAGE_ACCOUNT_KEY=$AZURE_STORAGE_ACCOUNT_KEY",
+                  "LogLevel=Info"
+                ],
+                "Hostname": "blobstoremodule",
+                "HostConfig": {
+                  "Binds": [
+                    "/datadrive/blob:/blobroot"
+                  ],
+                  "PortBindings": {
+                    "11002/tcp": [
+                      {
+                        "HostPort": "11002"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "source": {
+      "properties.desired": {
+        "DataLength": "1024",
+        "FieldLength": "1000",
+        "RowCount": "100",
+        "Interval": "180"
+      }
+    },
+    "blobstoremodule": {
+      "properties.desired": {
+        "deviceAutoDeleteProperties": {
+          "deleteOn": true,
+          "deleteAfterMinutes": 15
+        },
+        "deviceToCloudUploadProperties": {
+          "uploadOn": false
+        }
+      }
+    },
+    "$edgeHub": {
+      "properties.desired": {
+        "schemaVersion": "1.0",
+        "routes": {
+          "sourceToProcessor1": "FROM /messages/modules/source/outputs/output1 INTO BrokeredEndpoint(\"/modules/processor1/inputs/input1\")",
+          "processor1ToProcessor2": "FROM /messages/modules/processor1/outputs/output1 INTO BrokeredEndpoint(\"/modules/processor2/inputs/input1\")",
+          "processor2ToIoTHub": "FROM /messages/modules/processor2/outputs/* INTO $upstream"
+        },
+        "storeAndForwardConfiguration": {
+          "timeToLiveSecs": 7200
+        }
+      }
+    }
+  }
+}
